@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+   {% extends "base.html" %}
+   {% block content %}
+      <div class="container">
+            <div class="row">
+               <div class="col-md-6">
+               	<h3>Categories</h3>
+
+               	{%for i in category%}
+               	<a class="clickble-item" href="{{ url_for ('Index',category_id = i.id) }}"><li>{{i.name}}</li></a>
+               	</br>
+                {%endfor%}
+
+                  <br/>
+               </div>
+               <div class="col-md-6">
+			{%if loged %}
+               {%if c_id != 0 %}
+                 <a class="clickble-item" href="{{ url_for ('Add_Item',category_id = c_id) }}"><li>Add item</li></a>
+                 {%endif%}
+            {%endif%}
+					
+				{%if c_id == 0 %}
+                  <h3>Latest Items</h3>
+                  {%for i in items%}
+               	<a class="clickble-item" href="{{ url_for ('ShowItem',item_id = i.id) }}"><li>{{i.name}}</li></a>
+               	</br>
+                {%endfor%}
+                {%else%}
+                <h3>{{category[c_id - 1].name}} Items ({{items.count()}} Item/s)</h3>
+                {%for i in items%}
+               	<a class="clickble-item" href="{{ url_for ('ShowItem',item_id = i.id) }}"><li>{{i.name}}</li></a>
+               	</br>
+                {%endfor%}
+                 {%endif%}
+                  <br/>
+               </div>
+            </div>
+         </main>
+      </div>
+   {% endblock %}
+</html>

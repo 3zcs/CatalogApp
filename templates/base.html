@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+{% block head %}
+      <title>Catalog App</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="{{url_for('static',filename='css/bootstrap.min.css') }}">
+      <link rel="stylesheet" href="{{url_for('static',filename='css/custem.css') }}">
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+      <script src="https://npmcdn.com/tether@1.2.4/dist/js/tether.min.js"></script>
+      <script src="js/bootstrap.min.js"></script>
+      <nav class="navbar navbar-inverse navbar-custom ">
+  		<div class="container-fluid">
+    			<div class="navbar-header">
+    			<a class="navbar-brand" href="#">Catalog App</a>
+    			{% if loged%}
+          <form action="{{url_for('gdisconnect')}}">
+            <input type="submit" value="Sign out" />
+          </form>
+    			{%else%}
+    			 <form action="{{url_for('Login')}}">
+            <input type="submit" value="Sign in" />
+          </form>
+    			{% endif%}
+
+    </div>
+  </div>
+</nav>
+{% endblock %}
+   </head>
+   <body>
+<div id="content">{% block content %}{% endblock %}</div>
+   </body>
+<html>

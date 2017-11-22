@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+{% extends "base.html" %}
+   {% block content %}
+      <div class="container">
+        <div class="card">
+<div class="card-block">
+<h4 class="card-title">{{item.name}}</h4>
+<p class="card-text">{{item.description}}</p>
+{%if loged %}
+<form  action="{{url_for('Delete_item', item_id = c_id)}}" method="post">
+	 <button type="submit" name="submit" value="Edit" class="btn btn-default">Edit</button>
+  <button type="submit" name="submit" value="Delete" class="btn btn-default">Delete</button>
+</form>
+{%endif%}
+
+</div>
+</div>
+      </div>
+   {% endblock %}
+</html>
