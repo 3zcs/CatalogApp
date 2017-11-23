@@ -6,7 +6,7 @@ from flask import session as login_session
 import random
 import string
 from sqlalchemy import create_engine
-from database_setup import Base, Category, Item
+from database_setup import Base, Category, Item, User
 from sqlalchemy.orm import sessionmaker
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
@@ -36,21 +36,25 @@ def Index(category_id=0):
     return render_template('catalog.html', category=category,
                            c_id=category_id, items=items,
                            loged=isUserLoged())
+# main page, show list of category and items
 
 
 @app.route('/delete/<int:item_id>/', methods=['POST'])
 def Delete_item(item_id):
-    if request.form['submit'] == 'Delete':
+    if not isUserLoged():
+        return redirect(url_for('Index'))
+    if request.form['submit'] == 'Delete' and isUserAuthraized(item_id):
         return redirect(url_for('confirm', item_id=item_id))
-    elif request.form['submit'] == 'Confirmed':
+    elif request.form['submit'] == 'Confirmed' and isUserAuthraized(item_id):
         item = session.query(Item).filter_by(id=item_id).one()
         session.delete(item)
         session.commit()
-        return redirect(url_for('Index'))
-    elif request.form['submit'] == 'cancel':
-        return redirect(url_for('Index'))
-    else:
+        return redirect(url_for('Index')) 
+    elif isUserAuthraized(item_id):
         return redirect(url_for('Update_Item', item_id=item_id))
+    else:
+        redirect(url_for('Index'))
+# route to delete or edit,cancel take you to main page
 
 
 @app.route('/item/<int:item_id>/')
@@ -59,37 +63,50 @@ def ShowItem(item_id):
     item = session.query(Item).filter_by(id=item_id).one()
 
     return render_template('item.html', item=item, c_id=item.id,
-                           loged=isUserLoged())
+                           loged=isUserLoged() and isUserAuthraized(item_id))
+# show item with option delete or edit for loged user
 
 
 @app.route('/add_item/<int:category_id>')
 def Add_Item(category_id):
+    if not isUserLoged():
+        return redirect(url_for('Index'))
     category = session.query(Category).filter_by(id=category_id).one()
     return render_template('add_item.html', category=category,
                            loged=isUserLoged())
+# add item for loged user
 
 
 @app.route('/add_item/<int:category_id>', methods=['POST'])
 def New_Item(category_id):
+    if not isUserLoged():
+        return redirect(url_for('Index'))
     category = session.query(Category).all()
     if request.form['submit'] == 'save':
         name = request.form['name']
         description = request.form['description']
         session.add(Item(name=name, description=description,
-                    category_id=category_id))
+                    category_id=category_id,
+                    user_id=getUserID(login_session['email'])))
         session.commit()
 
     return redirect(url_for('Index'))
+# receive post from add_item and handle it
 
 
 @app.route('/confirm/<int:item_id>')
 def confirm(item_id):
+    if not isUserLoged() or not isUserAuthraized(item_id):
+        return redirect(url_for('Index'))
     return render_template('confirm.html', item_id=item_id,
                            loged=isUserLoged())
+# confirm to delete
 
 
 @app.route('/update/<int:item_id>', methods=['POST'])
 def Update(item_id):
+    if not isUserLoged() and not isUserAuthraized(item_id):
+        return redirect(url_for('Index'))
     if request.form['submit'] == 'save':
         item = session.query(Item).filter_by(id=item_id).one()
         item.name = request.form['name']
@@ -98,10 +115,13 @@ def Update(item_id):
         session.commit()
 
     return redirect(url_for('Index'))
+# update post from Update_Item
 
 
 @app.route('/update_item/<int:item_id>')
 def Update_Item(item_id):
+    if not isUserLoged() and not isUserAuthraized(item_id):
+        return redirect(url_for('Index'))
     item = session.query(Item).filter_by(id=item_id).one()
     i_id = item.category_id
     category = \
@@ -109,10 +129,19 @@ def Update_Item(item_id):
 
     return render_template('update_item.html', category=category,
                            item=item, loged=isUserLoged())
+# show item with option to edit or cancel
 
 
 def isUserLoged():
     return 'gplus_id' in login_session
+# check is user loged or not
+
+def isUserAuthraized(item_id):
+    item = session.query(Item).filter_by(id=item_id).one()
+    if item is None:
+        item = 0
+    return item.user_id == getUserID(login_session['email'])
+# check is user authraized or not
 
 
 @app.route('/login/')
@@ -121,6 +150,7 @@ def Login():
     login_session['state'] = state
 
     return render_template('login.html', STATE=state)
+# login page with google sing-in
 
 
 @app.route('/gdisconnect')
@@ -158,6 +188,23 @@ def gdisconnect():
         return response
 
 
+@app.route('/<int:item_id>/json/')
+def Json_item(item_id):
+
+    category = session.query(Category).all()
+    itemList = []
+    item = session.query(Item).filter_by(id=item_id).one()
+    new_item = {'name': i.name, 'id': i.id,
+                'description': i.description,
+                'category': category.name}
+    itemList.append(new_item)
+    result = json.dumps(itemList)
+    response = make_response(json.dumps(catalogList))
+    response.headers['content-type'] = 'application/json'
+    return response
+# Show one item as json
+
+
 @app.route('/json/')
 def Json():
     catalogList = []
@@ -176,6 +223,7 @@ def Json():
     response = make_response(json.dumps(catalogList))
     response.headers['content-type'] = 'application/json'
     return response
+# show full catalog as json
 
 
 @app.route('/gconnect', methods=['POST'])
@@ -264,6 +312,9 @@ def gconnect():
     login_session['picture'] = data['picture']
     login_session['email'] = data['email']
 
+    if getUserID(login_session['email']) is None:
+        createUser(login_session)
+
     output = ''
     output += '<h1>Welcome, '
     output += login_session['username']
@@ -274,6 +325,25 @@ def gconnect():
     flash('you are now logged in as %s' % login_session['username'])
     print 'done!'
     return output
+
+def createUser(login_session):
+    newUser = User(name=login_session['username'], email=login_session[
+                   'email'])
+    session.add(newUser)
+    session.commit()
+    user = session.query(User).filter_by(email=login_session['email']).one()
+    return user.id
+
+def getUserInfo(user_id):
+    user = session.query(User).filter_by(id=user_id).one()
+    return user
+
+def getUserID(email):
+    try:
+        user = session.query(User).filter_by(email=email).one()
+        return user.id
+    except:
+        return None
 
 
 def fill_database():
@@ -289,6 +359,7 @@ def fill_database():
     session.add(Category4)
     session.add(Category5)
     session.commit()
+# fill category list
 
 
 if __name__ == '__main__':
